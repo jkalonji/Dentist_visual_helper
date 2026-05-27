@@ -4,6 +4,7 @@ import { TranscriptionManager } from "../manager/TranscriptionManager";
 import { AudioManager } from "../manager/AudioManager";
 import { StorageManager } from "../manager/StorageManager";
 import { InputManager } from "../manager/InputManager";
+import { CommandManager } from "../manager/CommandManager";
 
 /**
  * User — per-user state container.
@@ -31,18 +32,27 @@ export class User {
   /** Button presses and touchpad gestures */
   input: InputManager;
 
+  /** Voice command engine — parsing, dictation, overlay */
+  command: CommandManager;
+
   constructor(public readonly userId: string) {
     this.photo = new PhotoManager(this);
     this.transcription = new TranscriptionManager(this);
     this.audio = new AudioManager(this);
     this.storage = new StorageManager(this);
     this.input = new InputManager(this);
+    this.command = new CommandManager(this);
   }
 
   /** Wire up a glasses connection — sets up all event listeners */
   setAppSession(session: AppSession): void {
     this.appSession = session;
-    this.transcription.setup(session);
+    this.command.setSession(session);
+    this.transcription.setup(
+      session,
+      (text) => this.command.processFinalTranscription(text),
+      (text) => this.command.processPartialTranscription(text),
+    );
     this.input.setup(session);
     console.log(`📸 Camera ready for ${this.userId}`);
   }
@@ -50,12 +60,14 @@ export class User {
   /** Disconnect glasses but keep user alive (photos, SSE clients stay) */
   clearAppSession(): void {
     this.transcription.destroy();
+    this.command.clearSession();
     this.appSession = null;
   }
 
   /** Nuke everything — call on full disconnect */
   cleanup(): void {
     this.transcription.destroy();
+    this.command.destroy();
     this.photo.destroy();
     this.appSession = null;
   }

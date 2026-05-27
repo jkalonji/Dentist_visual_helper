@@ -17,13 +17,20 @@ export class TranscriptionManager {
   constructor(private user: User) {}
 
   /** Wire up the transcription listener on the glasses session */
-  setup(session: AppSession): void {
+  setup(
+    session: AppSession,
+    onFinal?: (text: string) => void,
+    onPartial?: (text: string) => void,
+  ): void {
     this.unsubscribe = session.events.onTranscription(
       (data: TranscriptionData) => {
         if (data.isFinal) {
           console.log(
             `✅ Final transcription (${this.user.userId}): ${data.text}`,
           );
+          onFinal?.(data.text);
+        } else {
+          onPartial?.(data.text);
         }
         this.broadcast(data.text, data.isFinal);
       },
